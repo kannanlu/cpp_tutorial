@@ -1,4 +1,5 @@
 #include <iostream>
+#include <complex.hpp>
 
 int main(int argc, char *argv[])
 {
@@ -10,8 +11,9 @@ int main(int argc, char *argv[])
     //  char x = 'a';    this is a character
     // std::string expr = "some string" ; need to include <string> for c++ >11
     // bool flag = true ;  this is a boolean variable
-    // int a[2] , double b[3]  ,  these are arrays
-    // int a[2][2] , double b[5][6] , these are matrices (2D arrays)
+    // int a[2] , double b[3]  ,  these are arrays (1D)
+    // int a[2][2] , double b[5][6] , these are matrices (2D arrays)   a = { {1 , 2} , { 3, 4}  }    // 1[addr]  2
+    //  3[addr]  4
 
     /////////////////////////////////////////////////////////////////
     // control of flow
@@ -38,7 +40,7 @@ int main(int argc, char *argv[])
     // x = new double [10]; this address points to the first element of a 10-element array
     // delete[] x; after usage of this array, delete this to release memory
 
-    // double ** x; two addresses to store a 2D array of double, say 3x4 below
+    // double** x; two addresses to store a 2D array of double, say 3x4 below
     // x = new double * [3]; 3 rows
     // for (int ii =0; ii<3, ii++) { x[ii] = new double [4]; }   4 columns
     // to delete, you need to delete in two dimensions
@@ -55,7 +57,7 @@ int main(int argc, char *argv[])
     // to-do: io with file, linear system class, define matrices, vector, with methods of matrix inversion, newton method to solve linear systems
     // and newton-raphson method to solve nonlinear systems, use template to extend the linear system module to complex domain
 
-    char x = 'a';
+    ComplexNumber x = ComplexNumber(1, 2);
     std::cout << "the character is " << x << "\n";
     return 0;
 }

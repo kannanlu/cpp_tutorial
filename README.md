@@ -33,7 +33,24 @@ One can view the official documents and understand the basic syntax of Git. For 
 
 If you want to deploy code in different machines or simply share the code and have others contribute to it, you can use an online code repository. Some examples would be github and gitlab etc. For github, go to https://github.com/ , and follow the instructions to register an account with an email and a password. The way to push/pull your code to/from the repo is via ssh. To use ssh, you need to setup the ssh key and use the public key for communication with the repo. Use the following code to generate the ssh key
 _ ssh-keygen -t rsa -b 2048 _
-This will prompt you to enter a passphrase for your key, you can choose to leave it empty by hitting enter. After the key is generated, there will be two files under folder C:\Users\your_user_name\.ssh\ (for windows). One is the key, and the other is the corresponding public key with .pub extension. You can use notepad to open the public key and copy and paste it in the remote repo. After this, you should be able to create a repo on your remote and use the git to clone that repo to your local machine with the following
-_ git clone git@your_remote_repo_name _
-After you have cloned your remote repo to your local machine, you can make modifications to it and use Git as the version control and now you can push the changes to the remote with
-_ git push _
+This will prompt you to enter a passphrase for your key, you can choose to leave it empty by hitting enter. After the key is generated, there will be two files under folder C:\Users\your\*user_name\.ssh\ (for windows). One is the key, and the other is the corresponding public key with .pub extension. You can use notepad to open the public key and copy and paste it in the remote repo. After this, you should be able to create a repo on your remote and use the git to clone that repo to your local machine with the following
+
+- git clone git@your*remote_repo_name *
+  After you have cloned your remote repo to your local machine, you can make modifications to it and use Git as the version control and now you can push the changes to the remote with
+  _ git push _
+
+## cmake (recommended)
+
+Instead of `make` every project manually, it is recommended to use `cmake` and automatically bind the main project with submodules, and build the desired app.
+
+## required packages
+
+### eigen 3
+
+I used `eigen 3` for solving linear systems in this project. To install it on macOS,
+
+```
+brew install eigen
+```
+
+and check the installed path for this package, usually it should be in `/opt/homebrew/Cellar/eigen/3.4.0_1/include/eigen3/` on macOS, which can be included with `cmake`.

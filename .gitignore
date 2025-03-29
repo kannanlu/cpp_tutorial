@@ -36,3 +36,6 @@
 
 # zip data
 *.zip
+
+# macOS
+.DS_Store

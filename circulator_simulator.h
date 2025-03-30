@@ -169,6 +169,47 @@ public:
     }
 };
 
+class Inductor : public Component {
+private:
+    double prevCurrent; // Current through the inductor at the previous time step
+    double timeStep;    // Time step for the simulation
+
+public:
+    Inductor(int n1, int n2, double inductance, double dt)
+        : prevCurrent(0.0), timeStep(dt) {
+        node1 = n1;
+        node2 = n2;
+        value = inductance; // Inductance value (L)
+    }
+
+    void stamp(std::vector<std::vector<double>> &A, std::vector<double> &z,
+               const std::vector<double> &x, int numVoltageSources) override {
+        double gl = timeStep / value; // Conductance G_L = Δt / L
+        double il = prevCurrent;      // Current source I_L = I_prev
+
+        // Stamp conductance (similar to a resistor)
+        if (node1 > 0) {
+            A[node1 - 1][node1 - 1] += gl;
+            if (node2 > 0)
+                A[node1 - 1][node2 - 1] -= gl;
+        }
+        if (node2 > 0) {
+            if (node1 > 0)
+                A[node2 - 1][node1 - 1] -= gl;
+            A[node2 - 1][node2 - 1] += gl;
+        }
+
+        // Stamp current source (RHS vector z)
+        if (node1 > 0)
+            z[node1 - 1] += il;
+        if (node2 > 0)
+            z[node2 - 1] -= il;
+
+        // Update previous current for the next time step
+        prevCurrent = (node1 > 0 ? x[node1 - 1] : 0.0) - (node2 > 0 ? x[node2 - 1] : 0.0);
+    }
+};
+
 //===----------------------------------------------------------------------===//
 // Methods in the Circuit class
 //===----------------------------------------------------------------------===//

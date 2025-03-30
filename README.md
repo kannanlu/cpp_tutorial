@@ -63,7 +63,7 @@ The plot will be saved as `lc_oscillation.png`.
 
 ## MNA Time-Domain Solution
 
-The **Modified Nodal Analysis (MNA)** is used to solve the circuit in both DC and transient (time-domain) analysis. Here’s how the time-domain solution is implemented:
+The **Modified Nodal Analysis (MNA)** is used to solve the circuit in both DC and transient (time-domain) analysis. Here's how the time-domain solution is implemented:
 
 1. **System Construction**:
 
@@ -84,7 +84,7 @@ The **Modified Nodal Analysis (MNA)** is used to solve the circuit in both DC an
      - **Voltage Source**: Stamps entries into \( A \) and \( z \) to enforce the voltage constraint.
 
 4. **Solution**:
-   - The system \( A x = z \) is solved at each time step using **Eigen’s LU decomposition**.
+   - The system \( A x = z \) is solved at each time step using **Eigen's LU decomposition**.
    - The solution vector \( x \) is stored for each time step, allowing the results to be saved and plotted.
 
 ---

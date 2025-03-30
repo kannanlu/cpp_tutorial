@@ -43,6 +43,15 @@ This will prompt you to enter a passphrase for your key, you can choose to leave
 
 Instead of `make` every project manually, it is recommended to use `cmake` and automatically bind the main project with submodules, and build the desired app.
 
+For example, with `cmake`, one can compile the project with `clang++` with the following
+
+```
+mkdir build
+cd build
+cmake -DCMAKE_CXX_COMPILER=clang++ ..
+cmake --build .
+```
+
 ## required packages
 
 ### eigen 3

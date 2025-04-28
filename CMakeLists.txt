@@ -13,7 +13,8 @@ include_directories(
 )
 
 # Add executable
-add_executable (circuit circuit_main.cpp)
+# add_executable (circuit circuit_main.cpp)
+add_executable (jj jj_main.cpp)
 
 # Enable better warnings
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")

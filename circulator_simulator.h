@@ -1,6 +1,7 @@
 #ifndef CIRCUIT_SIMULATOR_H
 #define CIRCUIT_SIMULATOR_H
 
+#include <cmath>
 #include <string>
 #include <vector>
 #include <memory> // to allow dynamic memory allocaiton of using smart pointers
@@ -36,6 +37,9 @@ public:
 // 0 - R01 - 1 - R12 -2 - R23 - 3 - V1 - 0
 // A = [ [ 1/ R01 + 1/ R12] ]
 
+class JosephsonJunction;
+
+
 // Circuit class for holding the components and solve for the circuit
 class Circuit
 {
@@ -53,12 +57,16 @@ public:
     void addComponent(std::unique_ptr<Component> component); // populate A, z
     void buildSystem();                                      // populate z
     void runTransient(double endTime, double timeStep); // For time-domain analysis
+    void runTransient_jj(double endTime, double timeStep); // For time-domain analysis with Josephson Junction
     void runDC();
     void printA(); // For DC operating point
-    void printSolution(); // print the x solution
+    void printSolution(); // print the x solution, only for DC
     const std::vector<std::pair<double, std::vector<double>>>& getResults() const;
     void saveResultsToFile(const std::string& filename) const;
     void storeResults(double t); // Store results at time t
+
+    // Newton-Raphson solver for Josephson Junction
+    bool solveNR(std::vector<std::vector<double>>& A, std::vector<double>& z, std::vector<double>& x, JosephsonJunction* jj, double tolerance = 1e-6, int maxIterations = 100);
 };
 
 //===----------------------------------------------------------------------===//
@@ -182,6 +190,7 @@ public:
         value = inductance; // Inductance value (L)
     }
 
+    // FIXME : to be consistent with QUCS definition of the MNA of the inductor
     void stamp(std::vector<std::vector<double>> &A, std::vector<double> &z,
                const std::vector<double> &x, int numVoltageSources) override {
         double gl = timeStep / value; // Conductance G_L = Δt / L
@@ -210,6 +219,117 @@ public:
     }
 };
 
+
+// Specific to superconducting quantum computing, Josephson Junction
+class JosephsonJunction : public Component {
+private: 
+    // JJ parameters
+    double criticalCurrent; // Critical current (I_c)
+    double resistance;   // Resistance (R) in the RCJ model
+    double capacitance;  // Capacitance (C) in the RCJ model
+
+    // for NR solver and time evolution 
+    double prevVoltage;  // Previous voltage across the junction, in time 
+    double prevVoltage2; // Voltage from two steps ago (for derivative calculation)
+    double prevDVoltage; // Previous time derivative of voltage across the junction, in time
+    double prevPhase;  // Previous phase across the junction, in time
+    double prevNRphase; // Previous phase difference across the junction, in the NR solver step
+    double timeStep;     // Time step for the simulation
+
+    // extra device property
+    int phaseNode;       // Node for the phase variable, an extra node specific to JJ
+
+public:
+    JosephsonJunction(int n1, int n2, int pNode, double ic, double r, double c, double dt)
+        : criticalCurrent(ic), resistance(r), capacitance(c), prevVoltage(0.0), prevVoltage2(0.0), prevDVoltage(0.0), prevPhase(0.0), prevNRphase(0.0), timeStep(dt), phaseNode(pNode) {
+        node1 = n1;
+        node2 = n2;
+    }
+
+    int getPhaseNode() const {
+        return phaseNode;
+    }
+
+    void stamp(std::vector<std::vector<double>> &A, std::vector<double> &z,
+               const std::vector<double> &x, int numVoltageSources) override {
+        // Stamp resistor (R) contribution
+        double g = 1.0 / resistance;
+        if (node1 > 0) {
+            A[node1 - 1][node1 - 1] += g;
+            if (node2 > 0)
+                A[node1 - 1][node2 - 1] -= g;
+        }
+        if (node2 > 0) {
+            if (node1 > 0)
+                A[node2 - 1][node1 - 1] -= g;
+            A[node2 - 1][node2 - 1] += g;
+        }
+
+        // Stamp capacitor (C) contribution
+        double gc = 2 * capacitance / timeStep; // Conductance G_C = 2*C / Δt
+        double i_sc = -gc * prevVoltage + capacitance * prevDVoltage; // Current source 
+        if (node1 > 0) {
+            A[node1 - 1][node1 - 1] += gc;
+            if (node2 > 0)
+                A[node1 - 1][node2 - 1] -= gc;
+        }
+        if (node2 > 0) {
+            if (node1 > 0)
+                A[node2 - 1][node1 - 1] -= gc;
+            A[node2 - 1][node2 - 1] += gc;
+        }
+        if (node1 > 0)
+            z[node1 - 1] -= i_sc;
+        if (node2 > 0)
+            z[node2 - 1] += i_sc;
+
+        // Stamp Josephson junction current source (RHS vector z)
+        double i_jj = criticalCurrent * sin(prevNRphase) - criticalCurrent * prevNRphase * cos(prevNRphase);
+        if (node1 > 0)
+            z[node1 - 1] -= i_jj;
+        if (node2 > 0)
+            z[node2 - 1] += i_jj;
+
+        // Stamp phase node equation: V_phase = (2 * M_PI / Phi_0) * V_prev * timeStep
+        if (phaseNode > 0) {
+            A[phaseNode - 1][phaseNode - 1] += 1.0;
+            if (node1 > 0) {
+                A[node1 - 1][phaseNode-1] += criticalCurrent * cos(prevNRphase);
+                A[phaseNode-1][node1 -1] += -timeStep * 2 * M_PI / 2.0 / 2.067833848e-15;
+            }
+            if (node2 > 0) {
+                A[node2 - 1][phaseNode-1] -= criticalCurrent * cos(prevNRphase);
+                A[phaseNode - 1][node2 -1] -= -timeStep * 2 * M_PI / 2.0 / 2.067833848e-15;
+            }
+            z[phaseNode - 1] += -(2 * M_PI / 2.067833848e-15) * prevVoltage * timeStep / 2.0 - prevPhase;
+        }
+    }
+
+    // Method to update the previous voltage derivative
+    void updatePrevDVoltage(double currentVoltage) {
+        // Calculate the derivative using the previous two voltages
+        prevDVoltage = (currentVoltage - prevVoltage2) / (2 * timeStep);
+        // Update the previous voltages
+        prevVoltage2 = prevVoltage;
+        prevVoltage = currentVoltage;
+    }
+
+    // Method to set the initial NR phase for the current time step
+    void setInitialNRPhase() {
+        prevNRphase = prevPhase;
+    }
+
+    // Method to update the NR phase during the NR iterations
+    void updateNRPhase(double newNRPhase) {
+        prevNRphase = newNRPhase;
+    }
+
+    // Method to update the phase and voltage after the NR loop converges
+    void updatePhaseAndVoltage(double currentVoltage, double currentPhase) {
+        prevPhase = currentPhase;
+        prevVoltage = currentVoltage;
+    }
+};
 //===----------------------------------------------------------------------===//
 // Methods in the Circuit class
 //===----------------------------------------------------------------------===//
@@ -273,6 +393,101 @@ void Circuit::runDC() {
         x[i] = eigenX(i);
     }
 }
+
+// Newton Raphson solver for josephson junction
+bool Circuit::solveNR(std::vector<std::vector<double>>& A, std::vector<double>& z, std::vector<double>& x, JosephsonJunction* jj, double tolerance , int maxIterations) {
+    int iter = 0;
+    double error = tolerance + 1;
+
+    while (iter < maxIterations && error > tolerance) {
+        // Build the system for the current NR phase
+        buildSystem();
+
+        // Convert A and z to Eigen matrices
+        Eigen::MatrixXd eigenA(A.size(), A[0].size());
+        Eigen::VectorXd eigenZ(z.size());
+
+        // Copy data from std::vector to Eigen matrices
+        for (size_t i = 0; i < A.size(); ++i) {
+            for (size_t j = 0; j < A[i].size(); ++j) {
+                eigenA(i, j) = A[i][j];
+            }
+        }
+        for (size_t i = 0; i < z.size(); ++i) {
+            eigenZ(i) = z[i];
+        }
+
+        // Solve the system using Eigen's LU decomposition
+        Eigen::VectorXd eigenX = eigenA.lu().solve(eigenZ);
+
+        // Calculate the error (difference between current and previous solution)
+        error = 0.0;
+        for (size_t i = 0; i < x.size(); ++i) {
+            error += std::abs(eigenX(i) - x[i]);
+        }
+
+        // Update the solution vector
+        for (size_t i = 0; i < x.size(); ++i) {
+            x[i] = eigenX(i);
+        }
+
+        // Update the NR phase for the next iteration
+        double currentNRPhase = x[jj->getPhaseNode() - 1];
+        jj->updateNRPhase(currentNRPhase);
+
+        iter++;
+    }
+
+    return (error <= tolerance);
+}
+
+
+void Circuit::runTransient_jj(double endTime, double timeStep) {
+    // Clear previous results
+    results.clear();
+
+    // Initialize time
+    double t = 0.0;
+
+    // Run transient simulation
+    while (t < endTime) {
+        // Find the Josephson Junction in the circuit
+        JosephsonJunction* jj = nullptr;
+        for (const auto& component : components) {
+            if (auto* jjComponent = dynamic_cast<JosephsonJunction*>(component.get())) {
+                jj = jjComponent;
+                break;
+            }
+        }
+
+        if (jj) {
+            // Set the initial NR phase to the previous time step phase
+            jj->setInitialNRPhase();
+
+            // Solve the system using Newton-Raphson method
+            if (!solveNR(A, z, x, jj)) {
+                std::cerr << "Warning: NR solver did not converge at time " << t << std::endl;
+            }
+
+            // Update the previous voltage and phase for the next time step
+            double currentVoltage = (jj->getNode1() > 0 ? x[jj->getNode1() - 1] : 0.0) - (jj->getNode2() > 0 ? x[jj->getNode2() - 1] : 0.0);
+            double currentPhase = x[jj->getPhaseNode() - 1];
+
+            // Update the previous voltage and phase in the Josephson Junction
+            jj->updatePhaseAndVoltage(currentVoltage, currentPhase);
+
+            // Update the previous voltage derivative
+            jj->updatePrevDVoltage(currentVoltage);
+        }
+
+        // Store or process the results (e.g., save node voltages for plotting)
+        storeResults(t);
+
+        // Update time
+        t += timeStep;
+    }
+}
+
 
 void Circuit::runTransient(double endTime, double timeStep) {
     // Clear previous results
@@ -385,6 +600,17 @@ void Circuit::saveResultsToFile(const std::string& filename) const {
 void Circuit::addComponent(std::unique_ptr<Component> component) {
     // Update the number of nodes if necessary
     numNodes = std::max(numNodes, std::max(component->getNode1(), component->getNode2()));
+    
+    // If the component is a JosephsonJunction, ensure the phase node is considered
+    if (auto* jj = dynamic_cast<JosephsonJunction*>(component.get())) {
+        numNodes = std::max(numNodes, jj->getPhaseNode());
+    }
+    
+    // If the component is a voltage source, increment the number of voltage sources
+    if (component->isVoltageSource()) {
+        numVoltageSources++;
+    }
+    
     // Add the component to the list
     components.push_back(std::move(component));
 };

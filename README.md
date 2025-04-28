@@ -160,6 +160,20 @@ An LC circuit (inductor and capacitor in series) is simulated to demonstrate the
    - The voltage at Node 1 and Node 2, as well as the current through the inductor, are saved to `output.txt`.
    - The results are plotted using `gnuplot` to visualize the oscillation.
 
+## Example: JJ circuit
+
+A Josephson Junction (JJ) circuit is simulated to demonstrate the behavior of a superconducting device. The circuit is modelled as a JJ in series with a voltage source.
+
+1. **Components**:
+
+   - A Josephson Junction with critical current \( I_c \), capacitance \( C \) and resistor \( R \).
+   - A voltage source \( V\_{bias} \) is connected in series with the JJ.
+   - The circuit is simulated in the time domain.
+
+2. **Results**:
+   - The voltage across the JJ and the current through the JJ are saved to `jj_transient_results.txt.txt`.
+   - The results are plotted using `gnuplot` to visualize the voltage.
+
 ---
 
 ## License
